@@ -1,0 +1,27 @@
+// Copy this file to `appsettings.Development.json` and fill in your own values.
+// The real file is gitignored — never commit credentials.
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "ConnectionStrings": {
+    // Any Postgres login that is allowed to create databases; DbUp creates
+    // `boerit` and runs the migrations on first startup.
+    "DefaultConnection": "Host=localhost;Port=5432;Database=boerit;Username=postgres;Password=CHANGE_ME"
+  },
+  "Jwt": {
+    // Use a long random string (32+ chars). Generate one with:
+    //   [Convert]::ToBase64String((1..48 | % { Get-Random -Max 256 }))
+    "Secret": "CHANGE_ME_TO_A_LONG_RANDOM_SECRET",
+    "Issuer": "BoerIT",
+    "Audience": "BoerIT",
+    "ExpiryMinutes": "60"
+  },
+  "Cors": {
+    // Must include the port the frontend actually runs on (see BoerIT.UI/package.json).
+    "AllowedOrigins": "http://localhost:3000,http://localhost:3001"
+  }
+}

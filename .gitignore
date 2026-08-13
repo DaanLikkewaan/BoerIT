@@ -1,0 +1,53 @@
+# ---------------------------------------------------------------------------
+# Secrets — local config with real credentials. Commit the .example files only.
+# ---------------------------------------------------------------------------
+appsettings.Development.json
+.env.local
+.env*.local
+!.env.local.example
+
+# ---------------------------------------------------------------------------
+# .NET
+# ---------------------------------------------------------------------------
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+*.userprefs
+.vs/
+.vscode/
+[Dd]ebug/
+[Rr]elease/
+[Ll]og/
+[Ll]ogs/
+*.nupkg
+*.snupkg
+msbuild.log
+msbuild.err
+msbuild.wrn
+
+# ---------------------------------------------------------------------------
+# Node / Next.js
+# ---------------------------------------------------------------------------
+node_modules/
+.next/
+out/
+build/
+.pnp
+.pnp.js
+next-env.d.ts
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.vercel
+
+# ---------------------------------------------------------------------------
+# Tooling / OS
+# ---------------------------------------------------------------------------
+**/.claude/settings.local.json
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store

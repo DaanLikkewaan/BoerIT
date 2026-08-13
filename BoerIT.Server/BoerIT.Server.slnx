@@ -1,0 +1,11 @@
+<Solution>
+  <Project Path="../../../../../../../../General/Development/BoerIT/BoerIT.Server/BoerIT.Core/BoerIT.Core.csproj" Id="254c316d-71d3-4f00-a5e5-0608f428b1b7" />
+  <Project Path="../../../../../../../../General/Development/BoerIT/BoerIT.Server/BoerIT.DbUp/BoerIT.DbUp.csproj" Id="0282f6dd-e66b-406b-b5bb-6a869495c157" />
+  <Project Path="../../../../../../../../General/Development/BoerIT/BoerIT.Server/BoerIT.Server/BoerIT.Server.csproj">
+    <BuildDependency Project="../../../../../../../../General/Development/BoerIT/BoerIT.Server/BoerIT.Core/BoerIT.Core.csproj" />
+    <BuildDependency Project="../../../../../../../../General/Development/BoerIT/BoerIT.Server/BoerIT.Service/BoerIT.Service.csproj" />
+  </Project>
+  <Project Path="../../../../../../../../General/Development/BoerIT/BoerIT.Server/BoerIT.Service/BoerIT.Service.csproj" Id="64fd6198-540e-4068-86df-d224cd483582">
+    <BuildDependency Project="../../../../../../../../General/Development/BoerIT/BoerIT.Server/BoerIT.Core/BoerIT.Core.csproj" />
+  </Project>
+</Solution>
