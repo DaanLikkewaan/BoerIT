@@ -1,0 +1,178 @@
+# Deploy — push to `beta` deploys the beta environment, push to `main` deploys
+# production. Nothing else deploys.
+#
+# Each run builds both apps, signs in to Azure without a stored password
+# (OpenID Connect: GitHub vouches for this repo and environment, Azure trusts
+# that), pushes the app settings, deploys the API then the UI, and finally
+# checks that both answer.
+#
+# Everything environment-specific comes from the GitHub *environment* the job
+# runs in — `beta` or `production` — so the two can never cross wires.
+#
+#   Repository secrets (shared):     AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+#   Environment variables:           AZURE_RESOURCE_GROUP, API_APP_NAME, UI_APP_NAME, API_URL, UI_URL
+#   Environment secrets:             DB_CONNECTION_STRING, JWT_SECRET, DEMO_USERS
+#
+# docs/deployment.md explains how to create all of these.
+
+name: Deploy
+
+on:
+  push:
+    branches: ['beta', 'main']
+  workflow_dispatch:
+
+# Never run two deployments to the same environment at once, and never cancel
+# one half-way through — a half-deployed environment is worse than a queued one.
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write   # required for the OpenID Connect sign-in to Azure
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to ${{ github.ref_name == 'main' && 'production' || 'beta' }}
+    runs-on: ubuntu-latest
+    # Only these two branches may deploy, whatever triggered the run.
+    if: github.ref_name == 'main' || github.ref_name == 'beta'
+    environment:
+      name: ${{ github.ref_name == 'main' && 'production' || 'beta' }}
+      url: ${{ vars.UI_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Build the API ──────────────────────────────────────────────────────
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish API
+        run: >
+          dotnet publish BoerIT.Server/BoerIT.Server/BoerIT.Server.csproj
+          --configuration Release
+          --output ${{ runner.temp }}/api
+
+      # ── Build the UI ───────────────────────────────────────────────────────
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: BoerIT.UI/package-lock.json
+
+      - name: Build UI
+        working-directory: BoerIT.UI
+        run: |
+          npm ci
+          npm run build
+        env:
+          # Baked into the browser bundle at build time — hence one build per environment.
+          NEXT_PUBLIC_API_URL: ${{ vars.API_URL }}
+          NEXT_PUBLIC_ALLOW_REGISTRATION: 'false'
+
+      # The standalone build does not include static assets; Next expects them
+      # copied alongside server.js. startup.js pins the listen address, because
+      # App Service sets HOSTNAME to the container id and Next would otherwise
+      # bind to that instead of every interface.
+      - name: Package UI
+        run: |
+          out=${{ runner.temp }}/ui
+          cp -r BoerIT.UI/.next/standalone "$out"
+          mkdir -p "$out/.next"
+          cp -r BoerIT.UI/.next/static "$out/.next/static"
+          if [ -d BoerIT.UI/public ]; then cp -r BoerIT.UI/public "$out/public"; fi
+          cat > "$out/startup.js" <<'EOF'
+          process.env.HOSTNAME = '0.0.0.0';
+          require('./server.js');
+          EOF
+
+      # ── Sign in to Azure ───────────────────────────────────────────────────
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # ── Configure ──────────────────────────────────────────────────────────
+      # Settings are written from a file so values containing quotes or spaces
+      # (the DEMO_USERS JSON especially) survive intact. The file is deleted
+      # straight after, and `--output none` keeps the values out of the log.
+      - name: Configure API settings
+        env:
+          DB_CONNECTION_STRING: ${{ secrets.DB_CONNECTION_STRING }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          DEMO_USERS: ${{ secrets.DEMO_USERS }}
+          ASPNET_ENV: ${{ github.ref_name == 'main' && 'Production' || 'Beta' }}
+        run: |
+          settings=$(mktemp)
+          jq -n \
+            --arg cs "$DB_CONNECTION_STRING" \
+            --arg jwt "$JWT_SECRET" \
+            --arg demo "${DEMO_USERS:-[]}" \
+            --arg cors "${{ vars.UI_URL }}" \
+            --arg env "$ASPNET_ENV" \
+            '[
+              { name: "ASPNETCORE_ENVIRONMENT",               value: $env,   slotSetting: false },
+              { name: "ConnectionStrings__DefaultConnection", value: $cs,    slotSetting: false },
+              { name: "Jwt__Secret",                          value: $jwt,   slotSetting: false },
+              { name: "Jwt__Issuer",                          value: "BoerIT", slotSetting: false },
+              { name: "Jwt__Audience",                        value: "BoerIT", slotSetting: false },
+              { name: "Jwt__ExpiryMinutes",                   value: "480",  slotSetting: false },
+              { name: "Cors__AllowedOrigins",                 value: $cors,  slotSetting: false },
+              { name: "Auth__AllowRegistration",              value: "false", slotSetting: false },
+              { name: "DemoUsers",                            value: $demo,  slotSetting: false }
+            ]' > "$settings"
+          az webapp config appsettings set \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --name "${{ vars.API_APP_NAME }}" \
+            --settings "@$settings" \
+            --output none
+          rm -f "$settings"
+
+      - name: Configure UI settings
+        run: |
+          az webapp config appsettings set \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --name "${{ vars.UI_APP_NAME }}" \
+            --settings SCM_DO_BUILD_DURING_DEPLOYMENT=false \
+            --output none
+          az webapp config set \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --name "${{ vars.UI_APP_NAME }}" \
+            --startup-file "node startup.js" \
+            --output none
+
+      # ── Deploy ─────────────────────────────────────────────────────────────
+      # API first: the UI is useless without it, and the API's startup runs the
+      # database migrations and provisions the demo users.
+      - name: Deploy API
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.API_APP_NAME }}
+          package: ${{ runner.temp }}/api
+
+      - name: Deploy UI
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.UI_APP_NAME }}
+          package: ${{ runner.temp }}/ui
+
+      # ── Smoke test ─────────────────────────────────────────────────────────
+      # A cold start after a deploy can take a minute or two, so keep asking.
+      - name: Check both apps respond
+        run: |
+          check() {
+            for i in $(seq 1 30); do
+              code=$(curl -s -o /dev/null -w '%{http_code}' "$1" || true)
+              if [ "$code" = "200" ]; then echo "OK  $1"; return 0; fi
+              echo "… $1 answered $code, retrying ($i/30)"
+              sleep 10
+            done
+            echo "::error::$1 did not come up"
+            return 1
+          }
+          check "${{ vars.API_URL }}/health"
+          check "${{ vars.UI_URL }}/login"

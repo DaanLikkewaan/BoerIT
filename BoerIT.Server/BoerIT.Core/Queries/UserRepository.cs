@@ -50,6 +50,14 @@ public class UserRepository(string connectionString) : IUserRepository
         return await conn.QuerySingleAsync<User>(sql, user);
     }
 
+    public async Task UpdatePasswordHashAsync(Guid id, string passwordHash)
+    {
+        using var conn = CreateConnection();
+        await conn.ExecuteAsync(
+            "UPDATE users SET password_hash = @PasswordHash, updated_at = @UpdatedAt WHERE id = @Id",
+            new { Id = id, PasswordHash = passwordHash, UpdatedAt = DateTime.UtcNow });
+    }
+
     public async Task<bool> ExistsAsync(string email)
     {
         using var conn = CreateConnection();

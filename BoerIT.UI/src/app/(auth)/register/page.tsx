@@ -12,8 +12,32 @@ import { registerSchema, type RegisterFormData } from '@/lib/validators';
 import { authApi } from '@/lib/api/auth';
 import { useAuth } from '@/lib/auth/useAuth';
 import { ApiError } from '@/lib/api/client';
+import { ALLOW_REGISTRATION } from '@/lib/config';
 
 export default function RegisterPage() {
+  // Someone following an old link to /register on the private demo gets a
+  // clear explanation instead of a form the API would refuse.
+  if (!ALLOW_REGISTRATION) {
+    return (
+      <div className="text-center">
+        <h1 className="text-2xl font-semibold text-white">Sign-up is closed</h1>
+        <p className="mt-3 text-sm text-stone-400 leading-relaxed">
+          This is a private demo. Please sign in with the details you were given.
+        </p>
+        <Link
+          href="/login"
+          className="mt-6 inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-stone-950 font-semibold px-4 py-2 rounded-lg text-sm transition-colors"
+        >
+          Go to sign in
+        </Link>
+      </div>
+    );
+  }
+
+  return <RegisterForm />;
+}
+
+function RegisterForm() {
   const router = useRouter();
   const { setAuth } = useAuth();
   const [showPassword, setShowPassword] = useState(false);

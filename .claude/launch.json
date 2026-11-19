@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "api",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "C:/General/Development/BoerIT/BoerIT.Server/BoerIT.Server", "--launch-profile", "http"],
+      "port": 5271
+    },
+    {
+      "name": "ui",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "C:/General/Development/BoerIT/BoerIT.UI", "run", "dev"],
+      "port": 3001
+    }
+  ]
+}
