@@ -1,0 +1,63 @@
+# CI — build and type-check on every feature branch and on develop.
+#
+# Branch flow:  feature/* ──► develop ──► beta ──► main
+#                 (CI)         (CI)      (deploy    (deploy
+#                                         beta)      production)
+#
+# Deployments live in deploy.yml. This workflow only proves the code builds, so
+# a broken change is caught before it is merged towards beta.
+
+name: CI
+
+on:
+  push:
+    branches: ['feature/**', 'develop']
+  pull_request:
+    branches: ['develop', 'beta', 'main']
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  api:
+    name: API (.NET)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build
+        run: dotnet build BoerIT.Server/BoerIT.Server.slnx --configuration Release
+
+  ui:
+    name: UI (Next.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: BoerIT.UI
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: BoerIT.UI/package-lock.json
+
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: https://api.example.invalid
+
+      # After the build, so the route types Next generates under .next/types exist.
+      - name: Type-check
+        run: npx tsc --noEmit

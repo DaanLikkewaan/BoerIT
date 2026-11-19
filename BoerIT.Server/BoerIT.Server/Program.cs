@@ -1,6 +1,7 @@
 using BoerIT.Core.Interfaces;
 using BoerIT.Core.Queries;
 using BoerIT.Server.Middleware;
+using BoerIT.Server.Startup;
 using BoerIT.DbUp;
 using BoerIT.Service;
 using BoerIT.Service.Interfaces;
@@ -132,5 +133,11 @@ app.UseCors("NextJsClient");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
+// Liveness check for the deployment pipeline's smoke test and App Service's
+// health check. Reaching here means the migrations above already succeeded.
+app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
+
+await DemoUserSeeder.SeedAsync(app);
 
 app.Run();

@@ -47,6 +47,25 @@ public class AuthService(IUserRepository userRepository, IConfiguration configur
         return BuildAuthResult(user);
     }
 
+    public async Task<bool> EnsureUserAsync(string email, string password, string firstName, string lastName)
+    {
+        var existing = await userRepository.GetByEmailAsync(email.ToLower().Trim());
+
+        if (existing is null)
+        {
+            var result = await RegisterAsync(email, password, firstName, lastName);
+            return result.Success;
+        }
+
+        // The configured password is the source of truth, so rotating it in the
+        // deployment secrets is all it takes to change a demo user's password.
+        if (VerifyPassword(password, existing.PasswordHash))
+            return false;
+
+        await userRepository.UpdatePasswordHashAsync(existing.Id, HashPassword(password));
+        return true;
+    }
+
     public Task<AuthResult> RefreshTokenAsync(string refreshToken)
     {
         // Refresh token validation will be implemented in Phase 2

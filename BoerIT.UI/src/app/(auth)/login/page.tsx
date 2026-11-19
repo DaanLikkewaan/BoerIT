@@ -23,6 +23,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { ALLOW_REGISTRATION } from '@/lib/config';
 import { toast } from 'sonner';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 
@@ -129,10 +130,16 @@ export default function LoginPage() {
       </form>
 
       <p className="mt-6 text-center text-sm text-stone-500">
-        Don&apos;t have an account?{' '}
-        <Link href="/register" className="text-amber-400 hover:text-amber-300 font-medium transition-colors">
-          Create one
-        </Link>
+        {ALLOW_REGISTRATION ? (
+          <>
+            Don&apos;t have an account?{' '}
+            <Link href="/register" className="text-amber-400 hover:text-amber-300 font-medium transition-colors">
+              Create one
+            </Link>
+          </>
+        ) : (
+          <>This is a private demo. Use the sign-in details you were given.</>
+        )}
       </p>
     </div>
   );

@@ -85,3 +85,11 @@ Test login: **`test@boerit.local` / `Test1234!`** (or register a new account).
   because port 3000 is often occupied on this machine. The backend's
   `Cors:AllowedOrigins` allows both `:3000` and `:3001`. If you change the
   frontend port, add it there too or the browser will block API calls.
+
+## Hosting (beta and production)
+
+The app is hosted on Azure, with GitHub Actions deploying the `beta` branch to
+the beta environment and `main` to production. Feature branches and `develop`
+are only built and checked. See **[docs/deployment.md](docs/deployment.md)**
+for creating the Azure account, the one-off setup script, the GitHub
+configuration and the demo users.
